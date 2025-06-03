@@ -20,6 +20,7 @@ from approval_system import submit_for_approval, get_notifications
 from duplicate_check import check_duplicate_receipt
 from uploader_dashboard import render_uploader_dashboard
 import oracledb
+import time
 
 load_dotenv()
 username, user_role = require_login()
@@ -152,18 +153,61 @@ def check_db_connection():
         except:
             pass  # Already initialized or not available
         
-        conn = oracledb.connect(
-            user=db_username,
-            password=password,
-            dsn=dsn
-        )
-        conn.close()
-        st.session_state.db_connection_status = "connected"
-        return True
+        # Configure connection parameters
+        conn_params = {
+            'user': db_username,
+            'password': password,
+            'dsn': dsn,
+            'encoding': 'UTF-8',
+            'nencoding': 'UTF-8',
+            'events': False,
+            'threaded': True,
+            'timeout': 30,  # Connection timeout in seconds
+            'retry_count': 3,  # Number of connection retries
+            'retry_delay': 1,  # Delay between retries in seconds
+        }
+        
+        # Try to connect with retries
+        for attempt in range(conn_params['retry_count']):
+            try:
+                conn = oracledb.connect(**conn_params)
+                conn.close()
+                st.session_state.db_connection_status = "connected"
+                return True
+            except oracledb.DatabaseError as e:
+                if attempt < conn_params['retry_count'] - 1:
+                    time.sleep(conn_params['retry_delay'])
+                    continue
+                else:
+                    raise e
+                    
     except Exception as e:
-        st.session_state.db_connection_status = f"disconnected: {str(e)}"
-        # Add more detailed error information
-        if "private IP" in str(e).lower():
+        error_msg = str(e)
+        st.session_state.db_connection_status = f"disconnected: {error_msg}"
+        
+        # Provide specific error messages based on the error type
+        if "timed out" in error_msg.lower():
+            st.error("""
+            ⚠️ Database Connection Timeout
+            
+            Possible causes:
+            1. Database server is not responding
+            2. Network connectivity issues
+            3. Firewall blocking the connection
+            4. Database service is down
+            
+            Please check:
+            1. Database server is running
+            2. Network connection is stable
+            3. Firewall allows connections to port {port}
+            4. Database credentials are correct
+            
+            Connection details:
+            - Host: {host}
+            - Port: {port}
+            - Service: {service}
+            """.format(host=host, port=port, service=service))
+        elif "private IP" in error_msg.lower():
             st.error("""
             ⚠️ Database Connection Error: Private IP address not accessible from Streamlit Cloud
             
@@ -181,6 +225,16 @@ def check_db_connection():
             ORACLE_PORT = "your_port"
             ORACLE_SERVICE = "your_service"
             ```
+            """)
+        else:
+            st.error(f"""
+            ⚠️ Database Connection Error: {error_msg}
+            
+            Please verify:
+            1. Database credentials are correct
+            2. Database server is running
+            3. Network connection is stable
+            4. Firewall settings allow the connection
             """)
     
     return False
