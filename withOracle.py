@@ -29,6 +29,8 @@ try:
     print("Oracle client initialized in thick mode")
 except Exception as e:
     print(f"Warning: Could not initialize Oracle client: {e}")
+    # For cloud deployment, try without thick mode
+    pass
     
 
 if 'receipts' not in st.session_state:
@@ -123,11 +125,11 @@ def test_new_db_connection():
 
 def check_db_connection():
     try:
-        db_username = os.getenv("ORACLE_USERNAME", "apps")
-        password = os.getenv("ORACLE_PASSWORD", "TestApps#2025")
-        host = os.getenv("ORACLE_HOST", "10.50.65.11")
-        port = os.getenv("ORACLE_PORT", "1526")
-        service = os.getenv("ORACLE_SERVICE", "TEST")
+        db_username = os.getenv("ORACLE_USERNAME") or st.secrets.get("ORACLE_USERNAME", "apps")
+        password = os.getenv("ORACLE_PASSWORD") or st.secrets.get("ORACLE_PASSWORD")
+        host = os.getenv("ORACLE_HOST") or st.secrets.get("ORACLE_HOST", "10.50.65.11")
+        port = os.getenv("ORACLE_PORT") or st.secrets.get("ORACLE_PORT", "1526")
+        service = os.getenv("ORACLE_SERVICE") or st.secrets.get("ORACLE_SERVICE", "TEST")
         
         if not password:
             st.session_state.db_connection_status = "disconnected: No password found in environment variables"
@@ -141,10 +143,15 @@ def check_db_connection():
         except:
             pass  # Already initialized or not available
         
+        if host.startswith("10.") or host.startswith("192.168.") or host.startswith("172."):
+            st.session_state.db_connection_status = "disconnected: Private IP address not accessible from Streamlit Cloud"
+            return False
+
         conn = oracledb.connect(
             user=db_username,
             password=password,
-            dsn=dsn
+            dsn=dsn,
+            timeout=10
         )
         conn.close()
         st.session_state.db_connection_status = "connected"
