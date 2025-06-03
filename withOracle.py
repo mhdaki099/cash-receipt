@@ -124,6 +124,108 @@ def test_new_db_connection():
         return False
     
 
+# def check_db_connection():
+#     try:
+#         # Try to get credentials from Streamlit secrets first
+#         try:
+#             db_username = st.secrets["ORACLE_USERNAME"]
+#             password = st.secrets["ORACLE_PASSWORD"]
+#             host = st.secrets["ORACLE_HOST"]
+#             port = st.secrets["ORACLE_PORT"]
+#             service = st.secrets["ORACLE_SERVICE"]
+#         except:
+#             # Fallback to environment variables
+#             db_username = os.getenv("ORACLE_USERNAME", "apps")
+#             password = os.getenv("ORACLE_PASSWORD", "TestApps#2025")
+#             host = os.getenv("ORACLE_HOST", "10.50.65.11")
+#             port = os.getenv("ORACLE_PORT", "1526")
+#             service = os.getenv("ORACLE_SERVICE", "TEST")
+        
+#         if not password:
+#             st.session_state.db_connection_status = "disconnected: No password found in secrets or environment variables"
+#             return False
+            
+#         dsn = f"{host}:{port}/{service}"
+        
+#         # Try thick mode first
+#         try:
+#             oracledb.init_oracle_client()
+#         except:
+#             pass  # Already initialized or not available
+        
+#         # Check if we're trying to connect to a private IP from cloud
+#         if host.startswith("10.") or host.startswith("192.168.") or host.startswith("172."):
+#             st.session_state.db_connection_status = "disconnected: Private IP address not accessible from Streamlit Cloud"
+#             return False
+
+#         # Try to connect with basic parameters only
+#         conn = oracledb.connect(
+#             user=db_username,
+#             password=password,
+#             dsn=dsn
+#         )
+#         conn.close()
+#         st.session_state.db_connection_status = "connected"
+#         return True
+                    
+#     except Exception as e:
+#         error_msg = str(e)
+#         st.session_state.db_connection_status = f"disconnected: {error_msg}"
+        
+#         # Provide specific error messages based on the error type
+#         if "timed out" in error_msg.lower():
+#             st.error("""
+#             ⚠️ Database Connection Timeout
+            
+#             Possible causes:
+#             1. Database server is not responding
+#             2. Network connectivity issues
+#             3. Firewall blocking the connection
+#             4. Database service is down
+            
+#             Please check:
+#             1. Database server is running
+#             2. Network connection is stable
+#             3. Firewall allows connections to port {port}
+#             4. Database credentials are correct
+            
+#             Connection details:
+#             - Host: {host}
+#             - Port: {port}
+#             - Service: {service}
+#             """.format(host=host, port=port, service=service))
+#         elif "private IP" in error_msg.lower():
+#             st.error("""
+#             ⚠️ Database Connection Error: Private IP address not accessible from Streamlit Cloud
+            
+#             To fix this:
+#             1. Use a public endpoint for your Oracle database
+#             2. Set up a VPN connection
+#             3. Use Oracle Cloud with public access enabled
+            
+#             Update your database connection details in Streamlit secrets:
+#             ```toml
+#             [ORACLE]
+#             ORACLE_USERNAME = "your_username"
+#             ORACLE_PASSWORD = "your_password"
+#             ORACLE_HOST = "your_public_host"
+#             ORACLE_PORT = "your_port"
+#             ORACLE_SERVICE = "your_service"
+#             ```
+#             """)
+#         else:
+#             st.error(f"""
+#             ⚠️ Database Connection Error: {error_msg}
+            
+#             Please verify:
+#             1. Database credentials are correct
+#             2. Database server is running
+#             3. Network connection is stable
+#             4. Firewall settings allow the connection
+#             """)
+    
+#     return False
+
 def check_db_connection():
     try:
         # Try to get credentials from Streamlit secrets first
@@ -142,105 +244,51 @@ def check_db_connection():
             service = os.getenv("ORACLE_SERVICE", "TEST")
         
         if not password:
-            st.session_state.db_connection_status = "disconnected: No password found in secrets or environment variables"
+            st.session_state.db_connection_status = "disconnected: No password found"
+            return False
+        
+        # Check if we're trying to connect to a private IP from cloud
+        if host.startswith("10.") or host.startswith("192.168.") or host.startswith("172."):
+            st.session_state.db_connection_status = "disconnected: Private IP address not accessible from Streamlit Cloud"
             return False
             
         dsn = f"{host}:{port}/{service}"
         
-        # Try thick mode first
-        try:
-            oracledb.init_oracle_client()
-        except:
-            pass  # Already initialized or not available
-        
-        # Configure connection parameters
-        conn_params = {
-            'user': db_username,
-            'password': password,
-            'dsn': dsn,
-            'encoding': 'UTF-8',
-            'nencoding': 'UTF-8',
-            'events': False,
-            'threaded': True,
-            'timeout': 30,  # Connection timeout in seconds
-            'retry_count': 3,  # Number of connection retries
-            'retry_delay': 1,  # Delay between retries in seconds
-        }
-        
-        # Try to connect with retries
-        for attempt in range(conn_params['retry_count']):
-            try:
-                conn = oracledb.connect(**conn_params)
-                conn.close()
-                st.session_state.db_connection_status = "connected"
-                return True
-            except oracledb.DatabaseError as e:
-                if attempt < conn_params['retry_count'] - 1:
-                    time.sleep(conn_params['retry_delay'])
-                    continue
-                else:
-                    raise e
+        # Simple connection test
+        conn = oracledb.connect(
+            user=db_username,
+            password=password,
+            dsn=dsn
+        )
+        conn.close()
+        st.session_state.db_connection_status = "connected"
+        return True
                     
     except Exception as e:
         error_msg = str(e)
         st.session_state.db_connection_status = f"disconnected: {error_msg}"
-        
-        # Provide specific error messages based on the error type
-        if "timed out" in error_msg.lower():
-            st.error("""
-            ⚠️ Database Connection Timeout
-            
-            Possible causes:
-            1. Database server is not responding
-            2. Network connectivity issues
-            3. Firewall blocking the connection
-            4. Database service is down
-            
-            Please check:
-            1. Database server is running
-            2. Network connection is stable
-            3. Firewall allows connections to port {port}
-            4. Database credentials are correct
-            
-            Connection details:
-            - Host: {host}
-            - Port: {port}
-            - Service: {service}
-            """.format(host=host, port=port, service=service))
-        elif "private IP" in error_msg.lower():
-            st.error("""
-            ⚠️ Database Connection Error: Private IP address not accessible from Streamlit Cloud
-            
-            To fix this:
-            1. Use a public endpoint for your Oracle database
-            2. Set up a VPN connection
-            3. Use Oracle Cloud with public access enabled
-            
-            Update your database connection details in Streamlit secrets:
-            ```toml
-            [ORACLE]
-            ORACLE_USERNAME = "your_username"
-            ORACLE_PASSWORD = "your_password"
-            ORACLE_HOST = "your_public_host"
-            ORACLE_PORT = "your_port"
-            ORACLE_SERVICE = "your_service"
-            ```
-            """)
-        else:
-            st.error(f"""
-            ⚠️ Database Connection Error: {error_msg}
-            
-            Please verify:
-            1. Database credentials are correct
-            2. Database server is running
-            3. Network connection is stable
-            4. Firewall settings allow the connection
-            """)
+        return False
     
-    return False
-
 if st.session_state.db_connection_status is None:
     check_db_connection()
+
+def show_database_unavailable_message():
+    """Show a user-friendly message when database is unavailable"""
+    st.warning("""
+    🔒 **Database Currently Unavailable**
+    
+    Your Oracle database is on a private network (10.50.65.11) and cannot be reached from Streamlit Cloud.
+    
+    **Your receipts are being saved locally and you can:**
+    1. Download them as JSON files for manual import
+    2. View and manage them in this session
+    3. Submit them for approval workflow
+    
+    **To enable database connectivity:**
+    - Move your Oracle database to a public IP address
+    - Use Oracle Cloud Autonomous Database
+    - Set up a VPN tunnel
+    """)
 
 def insert_receipt_to_oracle(data):
     """Insert receipt data into the new XAKI_AR_CASH_REC_AI_H table"""
@@ -849,6 +897,20 @@ def create_manual_form(initial_data=None, auto_extracted=False):
                     st.session_state.last_receipt = receipt_data
                     st.session_state.form_submitted = True
 
+                    if st.session_state.db_connection_status != "connected":
+                        show_database_unavailable_message()
+                        
+                        # Add download option
+                        receipt_json = json.dumps(receipt_data, indent=2, default=str)
+                        st.download_button(
+                            "📥 Download Receipt Data (JSON)",
+                            receipt_json,
+                            file_name=f"receipt_{receipt_data['reference_number']}.json",
+                            mime="application/json"
+                        )
+                        
+                        st.info("💡 This receipt has been saved locally and submitted for approval workflow.")
+
                     if user_role == "salesperson":
                         with st.spinner("Submitting for manager approval..."):
                             approval_id = submit_for_approval(receipt_data, username)
@@ -1268,5 +1330,7 @@ st.markdown("Powered by AKI-GPT")
 #                 st.error(f"Failed to insert into Oracle DB: {e}")
 #     else:
 #         st.info("Please fill all required fields above to enable DB insertion.")
+
+
 
 
