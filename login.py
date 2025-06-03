@@ -149,7 +149,7 @@ def login_page():
                 st.session_state.authenticated = False
                 st.session_state.username = None
                 st.session_state.user_role = None
-                st.experimental_rerun()
+                st.rerun()
         else:
             # Login form
             with st.form("login_form"):
@@ -171,7 +171,7 @@ def login_page():
                         st.session_state.user_role = user_role
                         
                         st.success(f"Login successful! You are logged in as a {user_role}.")
-                        st.experimental_rerun()
+                        st.rerun()
                     else:
                         st.error("Invalid username or password")
             
